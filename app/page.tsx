@@ -41,15 +41,19 @@ function Tabs(props: React.PropsWithChildren<{}>) {
   );
 }
 
+const AGENTS_ENABLED = !!process.env.NEXT_PUBLIC_LK_AGENTS_ENDPOINT;
+
 function DemoMeetingTab(props: { label: string }) {
   const router = useRouter();
   const [e2ee, setE2ee] = useState(false);
   const [sharedPassphrase, setSharedPassphrase] = useState(randomString(64));
+  const [agentCount, setAgentCount] = useState(0);
   const startMeeting = () => {
+    const query = AGENTS_ENABLED && agentCount > 0 ? `?agents=${agentCount}` : '';
     if (e2ee) {
-      router.push(`/rooms/${generateRoomId()}#${encodePassphrase(sharedPassphrase)}`);
+      router.push(`/rooms/${generateRoomId()}${query}#${encodePassphrase(sharedPassphrase)}`);
     } else {
-      router.push(`/rooms/${generateRoomId()}`);
+      router.push(`/rooms/${generateRoomId()}${query}`);
     }
   };
   return (
@@ -59,6 +63,20 @@ function DemoMeetingTab(props: { label: string }) {
         Start Meeting
       </button>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {AGENTS_ENABLED && (
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem', alignItems: 'center' }}>
+            <label htmlFor="agent-count">AI agents to invite</label>
+            <input
+              id="agent-count"
+              type="number"
+              min={0}
+              max={25}
+              value={agentCount}
+              onChange={(ev) => setAgentCount(Math.max(0, Number(ev.target.value) || 0))}
+              style={{ width: '5rem' }}
+            />
+          </div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'row', gap: '1rem' }}>
           <input
             id="use-e2ee"

@@ -11,6 +11,8 @@ import {
 import styles from '../styles/SettingsMenu.module.css';
 import { CameraSettings } from './CameraSettings';
 import { MicrophoneSettings } from './MicrophoneSettings';
+import { AgentsPanel } from './AgentsPanel';
+import { AGENTS_ENABLED } from './useRoomAgents';
 /**
  * @alpha
  */
@@ -27,6 +29,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
   const settings = React.useMemo(() => {
     return {
       media: { camera: true, microphone: true, label: 'Media Devices', speaker: true },
+      agents: AGENTS_ENABLED ? { label: 'AI Agents' } : undefined,
       recording: recordingEndpoint ? { label: 'Recording' } : undefined,
     };
   }, []);
@@ -125,6 +128,7 @@ export function SettingsMenu(props: SettingsMenuProps) {
             )}
           </>
         )}
+        {activeTab === 'agents' && <AgentsPanel />}
         {activeTab === 'recording' && (
           <>
             <h3>Record Meeting</h3>

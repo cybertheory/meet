@@ -13,6 +13,10 @@ export default async function Page({
     hq?: string;
     codec?: string;
     singlePC?: string;
+    /** Number of AI agents to ensure are in the room, e.g. `?agents=5`. */
+    agents?: string;
+    /** Comma-separated preset ids to cycle through, e.g. `&personas=ada,blake`. */
+    personas?: string;
   }>;
 }) {
   const _params = await params;
@@ -23,6 +27,19 @@ export default async function Page({
       : 'vp9';
   const hq = _searchParams.hq === 'true' ? true : false;
   const singlePC = _searchParams.singlePC !== 'false';
+  const agentCount = Number.parseInt(_searchParams.agents ?? '', 10);
+  const autoAgents =
+    Number.isFinite(agentCount) && agentCount > 0
+      ? {
+          count: agentCount,
+          presetIds: _searchParams.personas
+            ? _searchParams.personas
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : undefined,
+        }
+      : undefined;
 
   return (
     <PageClientImpl
@@ -31,6 +48,7 @@ export default async function Page({
       hq={hq}
       codec={codec}
       singlePeerConnection={singlePC}
+      autoAgents={autoAgents}
     />
   );
 }

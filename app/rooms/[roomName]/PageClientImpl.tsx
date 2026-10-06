@@ -12,9 +12,11 @@ import {
   LocalUserChoices,
   PreJoin,
   RoomContext,
-  VideoConference,
 } from '@livekit/components-react';
+import { AgentVideoConference } from '@/lib/AgentVideoConference';
+import { AGENTS_ENABLED, AGENTS_ENDPOINT } from '@/lib/useRoomAgents';
 import {
+  ConnectionState,
   ExternalE2EEKeyProvider,
   RoomOptions,
   VideoCodec,
@@ -32,7 +34,14 @@ import { useLowCPUOptimizer } from '@/lib/usePerfomanceOptimiser';
 
 const CONN_DETAILS_ENDPOINT =
   process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT ?? '/api/connection-details';
-const SHOW_SETTINGS_MENU = process.env.NEXT_PUBLIC_SHOW_SETTINGS_MENU == 'true';
+const SHOW_SETTINGS_MENU = process.env.NEXT_PUBLIC_SHOW_SETTINGS_MENU == 'true' || AGENTS_ENABLED;
+
+export interface AutoAgentsOptions {
+  /** Number of agents to ensure are present in the room once connected. */
+  count: number;
+  /** Optional preset ids to cycle through. */
+  presetIds?: string[];
+}
 
 export function PageClientImpl(props: {
   roomName: string;
@@ -40,6 +49,7 @@ export function PageClientImpl(props: {
   hq: boolean;
   codec: VideoCodec;
   singlePeerConnection: boolean;
+  autoAgents?: AutoAgentsOptions;
 }) {
   const [preJoinChoices, setPreJoinChoices] = React.useState<LocalUserChoices | undefined>(
     undefined,
@@ -83,6 +93,7 @@ export function PageClientImpl(props: {
         <VideoConferenceComponent
           connectionDetails={connectionDetails}
           userChoices={preJoinChoices}
+          autoAgents={props.autoAgents}
           options={{
             codec: props.codec,
             hq: props.hq,
@@ -97,6 +108,7 @@ export function PageClientImpl(props: {
 function VideoConferenceComponent(props: {
   userChoices: LocalUserChoices;
   connectionDetails: ConnectionDetails;
+  autoAgents?: AutoAgentsOptions;
   options: {
     hq: boolean;
     codec: VideoCodec;
@@ -223,11 +235,43 @@ function VideoConferenceComponent(props: {
     }
   }, [lowPowerMode]);
 
+  // Auto-dispatch agents requested via `?agents=N[&personas=a,b]` once we're connected.
+  // `ensure: true` makes this idempotent, so a shared link doesn't add N agents per joiner.
+  const autoAgentsRequested = React.useRef(false);
+  React.useEffect(() => {
+    const auto = props.autoAgents;
+    const endpoint = AGENTS_ENDPOINT;
+    if (!auto || auto.count <= 0 || !endpoint) return;
+    const dispatch = () => {
+      if (autoAgentsRequested.current) return;
+      autoAgentsRequested.current = true;
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: room.name,
+          count: auto.count,
+          presetIds: auto.presetIds,
+          ensure: true,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) console.error('Failed to dispatch agents:', await res.text());
+        })
+        .catch((e) => console.error('Failed to dispatch agents:', e));
+    };
+    if (room.state === ConnectionState.Connected) dispatch();
+    room.on(RoomEvent.Connected, dispatch);
+    return () => {
+      room.off(RoomEvent.Connected, dispatch);
+    };
+  }, [room, props.autoAgents]);
+
   return (
     <div className="lk-room-container">
       <RoomContext.Provider value={room}>
         <KeyboardShortcuts />
-        <VideoConference
+        <AgentVideoConference
           chatMessageFormatter={formatChatMessageLinks}
           SettingsComponent={SHOW_SETTINGS_MENU ? SettingsMenu : undefined}
         />
